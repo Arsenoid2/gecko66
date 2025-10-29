@@ -102,6 +102,10 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 // Swagger documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// Root route → redirect to API docs
+app.get('/', (req, res) => {
+    res.redirect('/api-docs');
+});
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({
