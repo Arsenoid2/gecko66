@@ -1,4 +1,4 @@
-import express, {} from 'express';
+import express from 'express';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import * as XLSX from 'xlsx';

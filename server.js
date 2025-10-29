@@ -1,4 +1,4 @@
-import express, {} from 'express';
+import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -53,7 +53,7 @@ const swaggerOptions = {
             }
         }
     },
-    apis: ['./src/routes/*.ts', './src/models/*.ts']
+    apis: ['./routes/*.js']
 };
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 // Middleware
