@@ -1,0 +1,16 @@
+{
+  "name": "my-node-server",
+  "version": "1.0.0",
+  "description": "Node.js backend deployed on Render",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+    // add other dependencies your server uses, e.g. "mysql": "^2.18.1"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
