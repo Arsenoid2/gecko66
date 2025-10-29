@@ -143,15 +143,29 @@ export async function initializeDatabase() {
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `);
-            // Update categories table to include image field (check if column exists first)
-            db.all("PRAGMA table_info(categories)", [], (err, columns) => {
-                if (!err) {
-                    const hasImageColumn = columns.some(col => col.name === 'image');
-                    if (!hasImageColumn) {
-                        db.run('ALTER TABLE categories ADD COLUMN image TEXT');
-                    }
-                }
-            });
+			// Ensure categories table has image column before inserting defaults
+			const ensureCategoriesImageColumn = (next) => {
+				db.all("PRAGMA table_info(categories)", [], (err, columns) => {
+					if (err) {
+						console.error('Error reading categories schema:', err);
+						next(false);
+						return;
+					}
+					const hasImageColumn = columns.some(col => col.name === 'image');
+					if (hasImageColumn) {
+						next(true);
+						return;
+					}
+					db.run('ALTER TABLE categories ADD COLUMN image TEXT', (alterErr) => {
+						if (alterErr) {
+							console.error('Failed to add image column to categories:', alterErr);
+							next(false);
+							return;
+						}
+						next(true);
+					});
+				});
+			};
             // Ensure geckos table has show_on_web column
             db.all("PRAGMA table_info(geckos)", [], (err, columns) => {
                 if (!err) {
@@ -176,30 +190,40 @@ export async function initializeDatabase() {
                     }
                 });
             });
-            // Insert initial categories if not exists (not default - can be deleted)
-            const initialCategories = [
-                { id: 'macularius', name: 'Leopard Geckos', is_default: 0, image: 'https://images.unsplash.com/photo-1518665750801-883bf1905352?w=400&h=400&fit=crop' },
-                { id: 'angramainyu', name: 'Iraqi Geckos', is_default: 0, image: 'https://images.unsplash.com/photo-1565992441121-4367c2968f11?w=400&h=400&fit=crop' },
-                { id: 'fuscus', name: 'E. fuscus', is_default: 0, image: 'https://images.unsplash.com/photo-1551963831-b3b1ca40c98e?w=400&h=400&fit=crop' },
-                { id: 'hardwickii', name: 'E. hardwickii', is_default: 0, image: 'https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=400&h=400&fit=crop' }
-            ];
-            initialCategories.forEach((cat) => {
-                db.get('SELECT * FROM categories WHERE id = ?', [cat.id], (err, row) => {
-                    if (err) {
-                        console.error('Error checking category:', err);
-                        return;
-                    }
-                    if (!row) {
-                        db.run('INSERT INTO categories (id, name, is_default, image) VALUES (?, ?, ?, ?)', [cat.id, cat.name, cat.is_default, cat.image]);
-                    }
-                    else {
-                        // Update existing categories with images if they don't have one
-                        if (!row.image && cat.image) {
-                            db.run('UPDATE categories SET image = ? WHERE id = ?', [cat.image, cat.id]);
-                        }
-                    }
-                });
-            });
+			// Insert initial categories if not exists (not default - can be deleted)
+			const insertInitialCategories = () => {
+				const initialCategories = [
+					{ id: 'macularius', name: 'Leopard Geckos', is_default: 0, image: 'https://images.unsplash.com/photo-1518665750801-883bf1905352?w=400&h=400&fit=crop' },
+					{ id: 'angramainyu', name: 'Iraqi Geckos', is_default: 0, image: 'https://images.unsplash.com/photo-1565992441121-4367c2968f11?w=400&h=400&fit=crop' },
+					{ id: 'fuscus', name: 'E. fuscus', is_default: 0, image: 'https://images.unsplash.com/photo-1551963831-b3b1ca40c98e?w=400&h=400&fit=crop' },
+					{ id: 'hardwickii', name: 'E. hardwickii', is_default: 0, image: 'https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=400&h=400&fit=crop' }
+				];
+				// Determine if image column exists when inserting
+				db.all("PRAGMA table_info(categories)", [], (err, columns) => {
+					const hasImageColumn = !err && columns.some(col => col.name === 'image');
+					initialCategories.forEach((cat) => {
+						db.get('SELECT * FROM categories WHERE id = ?', [cat.id], (checkErr, row) => {
+							if (checkErr) {
+								console.error('Error checking category:', checkErr);
+								return;
+							}
+							if (!row) {
+								if (hasImageColumn) {
+									db.run('INSERT INTO categories (id, name, is_default, image) VALUES (?, ?, ?, ?)', [cat.id, cat.name, cat.is_default, cat.image]);
+								}
+								else {
+									db.run('INSERT INTO categories (id, name, is_default) VALUES (?, ?, ?)', [cat.id, cat.name, cat.is_default]);
+								}
+							}
+							else if (hasImageColumn && !row.image && cat.image) {
+								db.run('UPDATE categories SET image = ? WHERE id = ?', [cat.image, cat.id]);
+							}
+						});
+					});
+				});
+			};
+			// Ensure schema, then insert defaults
+			ensureCategoriesImageColumn(() => insertInitialCategories());
             // Insert default geckos if not exists
             db.get('SELECT COUNT(*) as count FROM geckos', [], (err, row) => {
                 if (err) {
